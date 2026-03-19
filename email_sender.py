@@ -31,11 +31,11 @@ PROCESSED_FILE = "/tmp/ventas_procesadas.txt"
 # DATOS DEL ÚNICO BUNDLE (CÁMBIALO UNA VEZ)
 # ============================================
 BUNDLE_INFO = {
-    "id": "prod_bundle_completo",  # ID del producto en Recurrente
-    "nombre": "COLECCIÓN COMPLETA 2026",
-    "precio": 169,
+    "id": "prod_hvmtars6",  # ID del producto en Recurrente
+    "nombre": "INFINITESCOUTS VJ LOOP BUNDLE",
+    "precio": 33,
     "link_descarga": "https://drive.google.com/file/d/1CI9OWiF7OZIyvBp-IckKsgBP80mO2RPo/view?usp=drive_link",  # LINK DIRECTO AL ZIP
-    "contiene": "99 loops en 4K + 1 estética exclusiva"
+    "contiene": "99 loops en HDcon estética exclusiva"
 }
 
 # ============================================
