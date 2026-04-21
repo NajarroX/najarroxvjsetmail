@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 # CONFIGURACIÓN (LEER DE VARIABLES DE ENTORNO)
 # ============================================
 
-GMAIL_USER = os.environ.get('GMAIL_USER', '')
-GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', '')
+GMAIL_USER = os.environ.get('GMAIL_USER', 'najarrox.exe@gmail.com')
+GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', 'obpg ctik ngcn ipqf')
 
 # ============================================
 # FUNCIÓN PRINCIPAL
