@@ -24,7 +24,7 @@ PRODUCTO_ID_PERMITIDO = "prod_hvmtars6"
 
 # LINK PRIVADO DE GOOGLE DRIVE (NO COMPARTIR, solo lo usa el servidor)
 # Cambia TU_ID_AQUI por el ID real de tu archivo
-LINK_PRIVADO_DRIVE = "https://drive.google.com/uc?export=download&id=1MX2gjwNU6JfEWGVkXnrueZUQMKBSyRcW"
+LINK_PRIVADO_DRIVE = "https://mega.nz/file/1uBjCCzK#aGwR6W6oFgF0Fhvgr8yVR2FcDOUf8sfEjoQuetsXJ1s"
 
 # Diccionario temporal para guardar contraseñas y tokens
 # Estructura: {email: {"contrasena": "NX-...", "timestamp": 1234567890, "token": "..."}}
