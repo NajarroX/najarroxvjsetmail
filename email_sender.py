@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# email_sender.py - Solo se encarga de enviar emails (sin API de Recurrente)
+# email_sender.py - Envía emails con el link de descarga
 
 import smtplib
 import logging
@@ -17,14 +17,11 @@ logger = logging.getLogger(__name__)
 GMAIL_USER = os.environ.get('GMAIL_USER', '')
 GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', '')
 
-# Link de descarga directa del ZIP (CÁMBIALO POR EL TUYO)
-LINK_DESCARGA = "https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO"
-
 # ============================================
 # FUNCIÓN PRINCIPAL
 # ============================================
 
-def enviar_email(destinatario, nombre_cliente, contrasena):
+def enviar_email(destinatario, nombre_cliente, contrasena, link_descarga):
     """
     Envía email con link de descarga y contraseña
     """
@@ -48,12 +45,12 @@ def enviar_email(destinatario, nombre_cliente, contrasena):
           </h1>
           
           <p>Tu <strong>INFINITESCOUTS VJ LOOP BUNDLE</strong> está lista para descargar.</p>
-          <p><small>99 loops en 4K + 1 estética exclusiva</small></p>
+          <p><small>100 loops de video en HD</small></p>
           
           <div style="background: black; color: white; padding: 20px; margin: 20px 0;">
             <p>🔗 LINK DE DESCARGA (haz clic para descargar el ZIP):</p>
-            <p><a href="{LINK_DESCARGA}" style="color: #8b5cf6; word-break: break-all;">
-              {LINK_DESCARGA}
+            <p><a href="{link_descarga}" style="color: #8b5cf6; word-break: break-all;">
+              {link_descarga}
             </a></p>
             
             <p style="margin-top: 15px;">🔐 CONTRASEÑA DE ACCESO (si es necesaria):</p>
