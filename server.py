@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # server.py - Servidor Flask con webhook para Recurrente
+# Versión con filtro por ID de producto
 
 from flask import Flask, request, jsonify
 import threading
@@ -19,7 +20,16 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ============================================
-# FUNCIONES PARA GENERAR CONTRASEÑA
+# CONFIGURACIÓN DEL PRODUCTO
+# ============================================
+PRODUCTO_ID_PERMITIDO = "prod_hvmtars6"  # ← TU ID DEL BUNDLE
+
+# Link de descarga (también se puede pasar desde email_sender.py)
+# Pero lo dejamos aquí por claridad
+LINK_DESCARGA = "https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO"
+
+# ============================================
+# FUNCIONES
 # ============================================
 
 def generar_contrasena(email_cliente):
@@ -38,7 +48,7 @@ def generar_contrasena(email_cliente):
 def webhook_recurrente():
     """
     Recurrente llama a este endpoint cuando ocurre un evento.
-    Es importante verificar que el evento sea 'payment.succeeded'
+    Solo procesa pagos exitosos del producto permitido.
     """
     try:
         # Obtener los datos que envía Recurrente
@@ -53,29 +63,53 @@ def webhook_recurrente():
         # Verificar que sea un pago exitoso
         if data.get('type') == 'payment.succeeded':
             
-            # Extraer información del cliente (AJUSTA SEGÚN LA RESPUESTA REAL)
             payment_data = data.get('data', {})
-            customer = payment_data.get('customer', {})
             
+            # ========================================
+            # EXTRAER EL ID DEL PRODUCTO COMPRADO
+            # ========================================
+            items = payment_data.get('items', [])
+            producto_comprado_id = None
+            
+            if items and len(items) > 0:
+                # El ID del producto puede venir en diferentes campos
+                producto_comprado_id = items[0].get('product_id') or items[0].get('id') or items[0].get('product')
+            
+            # ========================================
+            # VERIFICAR QUE SEA EL PRODUCTO CORRECTO
+            # ========================================
+            if producto_comprado_id != PRODUCTO_ID_PERMITIDO:
+                logger.warning(f"⚠️ Producto no autorizado: {producto_comprado_id}. Esperado: {PRODUCTO_ID_PERMITIDO}")
+                return jsonify({"status": "ignored", "reason": "invalid product"}), 200
+            
+            # ========================================
+            # EXTRAER DATOS DEL CLIENTE
+            # ========================================
+            customer = payment_data.get('customer', {})
             email = customer.get('email')
             nombre = customer.get('name', 'Cliente')
             
-            # También puede venir en otra estructura, por si acaso
+            # Si no viene en 'customer', buscar en otros lugares
             if not email:
                 email = payment_data.get('customer_email')
+            if not email:
+                email = payment_data.get('email')
             
             if not email:
                 logger.error("Webhook: No se pudo obtener el email del cliente")
+                logger.info(f"Datos recibidos: {payment_data.keys()}")
                 return jsonify({"status": "error", "message": "No email"}), 400
             
-            # Generar contraseña única
+            # ========================================
+            # GENERAR CONTRASEÑA Y ENVIAR EMAIL
+            # ========================================
             contrasena = generar_contrasena(email)
             
-            # Enviar email con el link de descarga
-            exito = enviar_email(email, nombre, contrasena)
+            # Llamar a la función de envío de email
+            exito = enviar_email(email, nombre, contrasena, LINK_DESCARGA)
             
             if exito:
-                logger.info(f"✅ Email enviado a {email}")
+                logger.info(f"✅ Email enviado a {email} para producto {producto_comprado_id}")
                 return jsonify({"status": "ok", "message": "Email sent"}), 200
             else:
                 logger.error(f"❌ Falló envío de email a {email}")
@@ -99,19 +133,24 @@ def home():
     <html>
     <head>
         <style>
-            body { font-family: monospace; background: #0a0a0a; color: white; padding: 40px; }
-            .container { max-width: 600px; margin: 0 auto; border: 3px solid #8b5cf6; padding: 30px; }
+            body { font-family: 'Space Mono', monospace; background: #0a0a0a; color: white; padding: 40px; }
+            .container { max-width: 600px; margin: 0 auto; border: 3px solid #8b5cf6; padding: 30px; background: rgba(0,0,0,0.5); }
             h1 { border-left: 8px solid #8b5cf6; padding-left: 20px; }
-            .status { color: #00c853; }
+            .status { color: #00c853; font-size: 1.2rem; }
+            .info { margin: 20px 0; }
+            a { color: #8b5cf6; }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>🚀 NAJARRO X STUDIO</h1>
             <p class="status">✅ SISTEMA ACTIVO CON WEBHOOK</p>
-            <p>📧 Envío automático de credenciales vía webhook</p>
-            <p>⚡ Tiempo de respuesta: inmediato</p>
-            <p>📊 <a href="/status">Ver estado</a></p>
+            <div class="info">
+                <p>📧 Envío automático de credenciales vía webhook</p>
+                <p>⚡ Tiempo de respuesta: inmediato</p>
+                <p>📊 <a href="/status">Ver estado detallado</a></p>
+                <p>❤️ <a href="/health">Health check</a></p>
+            </div>
         </div>
     </body>
     </html>
@@ -122,6 +161,7 @@ def status():
     return jsonify({
         "status": "activo",
         "modo": "webhook",
+        "producto_id": PRODUCTO_ID_PERMITIDO,
         "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "version": "2.0"
     })
@@ -137,4 +177,5 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     logger.info(f"🌐 Iniciando servidor con webhook en puerto {port}")
+    logger.info(f"🔒 Producto permitido: {PRODUCTO_ID_PERMITIDO}")
     app.run(host='0.0.0.0', port=port, debug=False)
