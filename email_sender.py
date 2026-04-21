@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 GMAIL_USER = os.environ.get('GMAIL_USER', 'najarrox.exe@gmail.com')
-GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', 'obpg ctik ngcn ipqf')
+GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', 'azqi nwuq wyfs ksla')
 
 def enviar_email(destinatario, nombre_cliente, contrasena, link_descarga):
     if not GMAIL_USER or not GMAIL_PASSWORD:
