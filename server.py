@@ -90,8 +90,8 @@ def webhook_recurrente():
     logger.info(f"📨 Tipo de evento detectado: {event_type}")
     
     # Solo procesar pagos exitosos
-    if event_type == 'payment.succeeded':
-        logger.info("✅ Evento es 'payment.succeeded', procesando...")
+    if event_type == 'payment_intent.succeeded':
+        logger.info("✅ Evento es 'payment_intent.succeeded', procesando...")
         
         # Extraer los datos del pago (pueden estar en diferentes lugares)
         payment_data = data.get('data', {})
