@@ -26,7 +26,7 @@ PRODUCTO_ID_PERMITIDO = "prod_hvmtars6"  # ← TU ID DEL BUNDLE
 
 # Link de descarga (también se puede pasar desde email_sender.py)
 # Pero lo dejamos aquí por claridad
-LINK_DESCARGA = "https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO"
+LINK_DESCARGA = "https://drive.google.com/uc?export=download&id=1MX2gjwNU6JfEWGVkXnrueZUQMKBSyRcW"
 
 # ============================================
 # FUNCIONES
