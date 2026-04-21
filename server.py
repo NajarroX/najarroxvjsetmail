@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # server.py - Servidor Flask con webhook para Recurrente
-# Versión mejorada: extrae correctamente el ID del producto
+# VERSIÓN CON DIAGNÓSTICO - Registra todo lo que llega
 
 from flask import Flask, request, jsonify
 import os
@@ -8,6 +8,7 @@ import logging
 import hashlib
 import random
 import string
+import json
 from datetime import datetime
 from email_sender import enviar_email
 
@@ -37,188 +38,176 @@ def generar_contrasena(email_cliente):
     extras = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     return f"NX-{hash_str}{extras}"
 
-def extraer_producto_id(payment_data):
-    """
-    Extrae el ID del producto del JSON de Recurrente.
-    Busca en múltiples ubicaciones posibles.
-    """
-    # 1. Buscar en items[0].product_id
-    items = payment_data.get('items', [])
-    if items and len(items) > 0:
-        item = items[0]
-        
-        # Probar diferentes campos
-        product_id = item.get('product_id')
-        if product_id:
-            return product_id
-        
-        product_id = item.get('id')
-        if product_id:
-            return product_id
-        
-        product_id = item.get('product')
-        if product_id:
-            return product_id
-        
-        # Buscar dentro de price
-        price = item.get('price', {})
-        product_id = price.get('product_id')
-        if product_id:
-            return product_id
-    
-    # 2. Buscar en data.product_id
-    product_id = payment_data.get('product_id')
-    if product_id:
-        return product_id
-    
-    # 3. Buscar en data.metadata
-    metadata = payment_data.get('metadata', {})
-    product_id = metadata.get('product_id')
-    if product_id:
-        return product_id
-    
-    return None
-
-def extraer_email_cliente(payment_data):
-    """
-    Extrae el email del cliente del JSON de Recurrente.
-    Busca en múltiples ubicaciones posibles.
-    """
-    # 1. Buscar en customer.email
-    customer = payment_data.get('customer', {})
-    email = customer.get('email')
-    if email:
-        return email
-    
-    # 2. Buscar directamente en customer_email
-    email = payment_data.get('customer_email')
-    if email:
-        return email
-    
-    # 3. Buscar en email
-    email = payment_data.get('email')
-    if email:
-        return email
-    
-    # 4. Buscar en metadata
-    metadata = payment_data.get('metadata', {})
-    email = metadata.get('email')
-    if email:
-        return email
-    
-    return None
-
-def extraer_nombre_cliente(payment_data):
-    """
-    Extrae el nombre del cliente del JSON de Recurrente.
-    """
-    customer = payment_data.get('customer', {})
-    nombre = customer.get('name')
-    if nombre:
-        return nombre
-    
-    nombre = payment_data.get('customer_name')
-    if nombre:
-        return nombre
-    
-    nombre = payment_data.get('name')
-    if nombre:
-        return nombre
-    
-    return "Cliente"
-
 # ============================================
-# WEBHOOK - DONDE RECURRENTE NOS LLAMA
+# WEBHOOK - CON DIAGNÓSTICO COMPLETO
 # ============================================
 
 @app.route('/webhook', methods=['POST'])
 def webhook_recurrente():
-    """
-    Recurrente llama a este endpoint cuando ocurre un evento.
-    Solo procesa pagos exitosos del producto permitido.
-    """
+    """Endpoint que Recurrente (Svix) llama cuando hay un evento"""
+    
+    # ========================================
+    # DIAGNÓSTICO: Registrar TODO lo que llega
+    # ========================================
+    logger.info("=" * 60)
+    logger.info("🔍 DIAGNÓSTICO: Webhook recibido")
+    logger.info(f"📅 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # 1. Registrar headers
+    logger.info("📋 HEADERS:")
+    for key, value in dict(request.headers).items():
+        logger.info(f"    {key}: {value}")
+    
+    # 2. Registrar cuerpo raw (texto plano)
+    raw_data = request.get_data(as_text=True)
+    logger.info(f"📄 CUERPO RAW (texto): {raw_data[:500]}{'...' if len(raw_data) > 500 else ''}")
+    
+    # 3. Intentar parsear como JSON
+    data = None
     try:
-        # Verificar que el Content-Type sea application/json
-        if not request.is_json:
-            logger.error(f"Content-Type no es JSON: {request.content_type}")
-            return jsonify({"status": "error", "message": "Expected JSON"}), 415
-        
-        # Obtener los datos que envía Recurrente
         data = request.get_json()
-        
-        if not data:
-            logger.warning("Webhook recibido sin datos")
-            return jsonify({"status": "error", "message": "No data"}), 400
-        
-        event_type = data.get('type')
-        logger.info(f"📨 Webhook recibido: {event_type}")
-        
-        # Verificar que sea un pago exitoso
-        if event_type == 'payment.succeeded':
-            
-            payment_data = data.get('data', {})
-            
-            # ========================================
-            # EXTRAER EL ID DEL PRODUCTO COMPRADO
-            # ========================================
-            producto_comprado_id = extraer_producto_id(payment_data)
-            
-            if not producto_comprado_id:
-                # Si no se pudo extraer, mostrar la estructura para depurar
-                logger.warning("No se pudo extraer el ID del producto")
-                logger.info(f"Estructura de payment_data: {list(payment_data.keys())}")
-                items = payment_data.get('items', [])
-                if items:
-                    logger.info(f"Primer item: {items[0]}")
-                return jsonify({"status": "error", "message": "Product ID not found"}), 400
-            
-            # ========================================
-            # VERIFICAR QUE SEA EL PRODUCTO CORRECTO
-            # ========================================
-            if producto_comprado_id != PRODUCTO_ID_PERMITIDO:
-                logger.warning(f"⚠️ Producto no autorizado: {producto_comprado_id}. Esperado: {PRODUCTO_ID_PERMITIDO}")
-                return jsonify({"status": "ignored", "reason": "invalid product"}), 200
-            
-            logger.info(f"✅ Producto verificado: {producto_comprado_id}")
-            
-            # ========================================
-            # EXTRAER DATOS DEL CLIENTE
-            # ========================================
-            email = extraer_email_cliente(payment_data)
-            nombre = extraer_nombre_cliente(payment_data)
-            
-            if not email:
-                logger.error("❌ No se pudo obtener el email del cliente")
-                logger.info(f"Datos disponibles: {list(payment_data.keys())}")
-                return jsonify({"status": "error", "message": "No email"}), 400
-            
-            logger.info(f"📧 Cliente: {nombre} <{email}>")
-            
-            # ========================================
-            # GENERAR CONTRASEÑA Y ENVIAR EMAIL
-            # ========================================
-            contrasena = generar_contrasena(email)
-            
-            # Enviar email
-            exito = enviar_email(email, nombre, contrasena, LINK_DESCARGA)
-            
-            if exito:
-                logger.info(f"✅ Email enviado a {email}")
-                return jsonify({"status": "ok", "message": "Email sent"}), 200
-            else:
-                logger.error(f"❌ Falló envío de email a {email}")
-                return jsonify({"status": "error", "message": "Email failed"}), 500
-        
-        # Si el evento no es un pago exitoso, lo ignoramos
-        logger.info(f"Evento ignorado: {event_type}")
-        return jsonify({"status": "ignored"}), 200
-        
+        logger.info("✅ JSON parseado correctamente")
+        logger.info(f"📊 JSON COMPLETO:\n{json.dumps(data, indent=2, ensure_ascii=False)}")
     except Exception as e:
-        logger.error(f"Error en webhook: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.error(f"❌ Error parseando JSON: {e}")
+    
+    # 4. Si no hay datos, responder
+    if not data:
+        logger.warning("⚠️ No se pudo obtener JSON válido")
+        return jsonify({"status": "error", "message": "Invalid JSON"}), 400
+    
+    # ========================================
+    # PROCESAR EL EVENTO
+    # ========================================
+    
+    # Extraer el tipo de evento (puede estar en diferentes lugares)
+    event_type = data.get('type')
+    if not event_type:
+        event_type = data.get('event')
+    if not event_type:
+        event_type = data.get('event_type')
+    
+    logger.info(f"📨 Tipo de evento detectado: {event_type}")
+    
+    # Solo procesar pagos exitosos
+    if event_type == 'payment.succeeded':
+        logger.info("✅ Evento es 'payment.succeeded', procesando...")
+        
+        # Extraer los datos del pago (pueden estar en diferentes lugares)
+        payment_data = data.get('data', {})
+        if not payment_data:
+            payment_data = data.get('payload', {})
+        if not payment_data:
+            payment_data = data
+        
+        logger.info(f"📦 Datos del pago: {list(payment_data.keys())}")
+        
+        # ========================================
+        # EXTRAER ID DEL PRODUCTO
+        # ========================================
+        producto_comprado_id = None
+        
+        # Buscar en items
+        items = payment_data.get('items', [])
+        if items and len(items) > 0:
+            item = items[0]
+            producto_comprado_id = item.get('product_id')
+            if not producto_comprado_id:
+                producto_comprado_id = item.get('id')
+            if not producto_comprado_id:
+                producto_comprado_id = item.get('product')
+            if not producto_comprado_id and 'product' in item:
+                producto_comprado_id = item['product'].get('id') if isinstance(item['product'], dict) else item['product']
+        
+        # Buscar en product
+        if not producto_comprado_id:
+            product = payment_data.get('product', {})
+            producto_comprado_id = product.get('id')
+        
+        # Buscar en price
+        if not producto_comprado_id:
+            price = payment_data.get('price', {})
+            producto_comprado_id = price.get('product_id')
+        
+        logger.info(f"🏷️ ID del producto extraído: {producto_comprado_id}")
+        
+        # ========================================
+        # VERIFICAR PRODUCTO
+        # ========================================
+        if producto_comprado_id != PRODUCTO_ID_PERMITIDO:
+            logger.warning(f"⚠️ Producto NO autorizado: {producto_comprado_id} (Esperado: {PRODUCTO_ID_PERMITIDO})")
+            return jsonify({"status": "ignored", "reason": "invalid product"}), 200
+        
+        logger.info(f"✅ Producto verificado: {producto_comprado_id}")
+        
+        # ========================================
+        # EXTRAER EMAIL DEL CLIENTE
+        # ========================================
+        email = None
+        
+        # Buscar en customer
+        customer = payment_data.get('customer', {})
+        email = customer.get('email')
+        
+        # Buscar directamente
+        if not email:
+            email = payment_data.get('customer_email')
+        if not email:
+            email = payment_data.get('email')
+        
+        # Buscar en metadata
+        if not email:
+            metadata = payment_data.get('metadata', {})
+            email = metadata.get('email')
+        
+        # Buscar en payload
+        if not email:
+            payload = data.get('payload', {})
+            customer = payload.get('customer', {})
+            email = customer.get('email')
+        
+        # ========================================
+        # EXTRAER NOMBRE DEL CLIENTE
+        # ========================================
+        nombre = "Cliente"
+        
+        if customer:
+            nombre = customer.get('name', nombre)
+        if not nombre or nombre == "Cliente":
+            nombre = payment_data.get('customer_name', nombre)
+        if not nombre or nombre == "Cliente":
+            nombre = payment_data.get('name', nombre)
+        
+        # ========================================
+        # VERIFICAR EMAIL
+        # ========================================
+        if not email:
+            logger.error("❌ No se pudo extraer el email del cliente")
+            logger.info(f"Datos disponibles en payment_data: {list(payment_data.keys())}")
+            return jsonify({"status": "error", "message": "No email found"}), 400
+        
+        logger.info(f"📧 Cliente: {nombre} <{email}>")
+        
+        # ========================================
+        # GENERAR CONTRASEÑA Y ENVIAR EMAIL
+        # ========================================
+        contrasena = generar_contrasena(email)
+        
+        exito = enviar_email(email, nombre, contrasena, LINK_DESCARGA)
+        
+        if exito:
+            logger.info(f"✅ Email enviado exitosamente a {email}")
+            return jsonify({"status": "ok", "message": "Email sent"}), 200
+        else:
+            logger.error(f"❌ Falló el envío de email a {email}")
+            return jsonify({"status": "error", "message": "Email failed"}), 500
+    
+    # Evento no es payment.succeeded
+    logger.info(f"Evento ignorado (no es payment.succeeded): {event_type}")
+    return jsonify({"status": "ignored", "event": event_type}), 200
 
 # ============================================
-# ENDPOINTS DE ESTADO (para monitoreo)
+# ENDPOINTS DE ESTADO
 # ============================================
 
 @app.route('/')
@@ -228,10 +217,9 @@ def home():
     <head>
         <style>
             body { font-family: monospace; background: #0a0a0a; color: white; padding: 40px; }
-            .container { max-width: 600px; margin: 0 auto; border: 3px solid #8b5cf6; padding: 30px; background: rgba(0,0,0,0.5); }
+            .container { max-width: 600px; margin: 0 auto; border: 3px solid #8b5cf6; padding: 30px; }
             h1 { border-left: 8px solid #8b5cf6; padding-left: 20px; }
-            .status { color: #00c853; font-size: 1.2rem; }
-            a { color: #8b5cf6; }
+            .status { color: #00c853; }
         </style>
     </head>
     <body>
@@ -241,6 +229,7 @@ def home():
             <p>📧 Envío automático de credenciales</p>
             <p>⚡ Respuesta inmediata</p>
             <p>🔒 Producto permitido: prod_hvmtars6</p>
+            <p>🔍 Modo diagnóstico activo</p>
             <p>📊 <a href="/status">Ver estado</a></p>
         </div>
     </body>
@@ -251,10 +240,10 @@ def home():
 def status():
     return jsonify({
         "status": "activo",
-        "modo": "webhook",
+        "modo": "diagnostico",
         "producto_id": PRODUCTO_ID_PERMITIDO,
         "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "version": "2.1"
+        "version": "3.0-diagnostico"
     })
 
 @app.route('/health')
@@ -267,6 +256,9 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    logger.info(f"🌐 Iniciando servidor en puerto {port}")
+    logger.info("=" * 60)
+    logger.info("🚀 INICIANDO SERVIDOR CON DIAGNÓSTICO")
+    logger.info(f"🌐 Puerto: {port}")
     logger.info(f"🔒 Producto permitido: {PRODUCTO_ID_PERMITIDO}")
+    logger.info("=" * 60)
     app.run(host='0.0.0.0', port=port, debug=False)
