@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURACIÓN
 # ============================================
 RECURRENTE_API_KEY = os.environ.get('RECURRENTE_API_KEY', '')
-RECURRENTE_API_URL = "https://app.recurrente.com/api"
+RECURRENTE_API_URL = "https://app.recurrente.com/api/"
 
 GMAIL_USER = os.environ.get('GMAIL_USER', '')
 GMAIL_PASSWORD = os.environ.get('GMAIL_PASSWORD', '')
